@@ -1,16 +1,20 @@
+# core/utils.py
+from __future__ import annotations
 import re
 import pandas as pd
 from datetime import date, datetime
+from typing import Optional
 
-def pt_date_to_dt(s):
+def pt_date_to_dt(s) -> Optional[date]:
+    s = str(s).strip() if s is not None else ""
     for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
         try:
-            return datetime.strptime(str(s), fmt).date()
+            return datetime.strptime(s, fmt).date()
         except Exception:
             pass
     return None
 
-def to_ddmmyyyy(value):
+def to_ddmmyyyy(value) -> str:
     if value is None or value == "":
         return ""
     if isinstance(value, pd.Timestamp):
@@ -21,46 +25,6 @@ def to_ddmmyyyy(value):
         return value.strftime("%d/%m/%Y")
     d = pt_date_to_dt(value)
     return d.strftime("%d/%m/%Y") if d else str(value)
-
-def att_norm(v) -> str:
-    s = re.sub(r"\D", "", str(v or ""))
-    s = s.lstrip("0")
-    return s if s else "0"
-
-def att_to_number(v):
-    s = re.sub(r"\D", "", str(v or ""))
-    if not s:
-        return None
-    try:
-        return float(s)
-    except Exception:
-        return None
-
-def fmt_id_str(x) -> str:
-    if x is None:
-        return ""
-    s = str(x).strip()
-    if s == "":
-        return ""
-    try:
-        f = float(s)
-        if abs(f - int(f)) < 1e-9:
-            return str(int(f))
-        return ("{0}".format(f)).replace(",", ".")
-    except Exception:
-        return s
-
-def safe_merge(left, right, left_on, right_on, how="left", suffixes=("", "_right")):
-    if not isinstance(left, pd.DataFrame) or left.empty:
-        return left if isinstance(left, pd.DataFrame) else pd.DataFrame()
-    if not isinstance(right, pd.DataFrame) or right.empty or (right_on not in right.columns):
-        right = pd.DataFrame(columns=[right_on])
-    if left_on not in left.columns:
-        return left
-    try:
-        return left.merge(right, left_on=left_on, right_on=right_on, how=how, suffixes=suffixes)
-    except KeyError:
-        return left
 
 def to_float_or_none(v):
     if v is None or v == "":
@@ -86,3 +50,62 @@ def format_currency_br(v) -> str:
         return f"R$ {s}"
     except Exception:
         return f"R$ {v}"
+
+def att_norm(v) -> str:
+    """Somente dígitos, sem zeros à esquerda. Retorna '0' se vazio."""
+    s = re.sub(r"\D", "", str(v or ""))
+    s = s.lstrip("0")
+    return s if s else "0"
+
+def att_to_number(v):
+    """Compatível com schema atual (float)."""
+    s = re.sub(r"\D", "", str(v or ""))
+    if not s:
+        return None
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+def fmt_id_str(x) -> str:
+    """Remove '.0', notação científica; preserva strings não numéricas."""
+    if x is None:
+        return ""
+    s = str(x).strip()
+    if s == "":
+        return ""
+    try:
+        f = float(s)
+        if abs(f - int(f)) < 1e-9:
+            return str(int(f))
+        return ("{0}".format(f)).replace(",", ".")
+    except Exception:
+        return s
+
+def safe_merge(
+    left: pd.DataFrame,
+    right: pd.DataFrame,
+    left_on: str,
+    right_on: str,
+    how: str = "left",
+    suffixes=("", "_right"),
+) -> pd.DataFrame:
+    if not isinstance(left, pd.DataFrame) or left.empty:
+        return left if isinstance(left, pd.DataFrame) else pd.DataFrame()
+
+    if not isinstance(right, pd.DataFrame) or right.empty or (right_on not in right.columns):
+        right = pd.DataFrame(columns=[right_on])
+
+    if left_on not in left.columns:
+        return left
+
+    try:
+        return left.merge(right, left_on=left_on, right_on=right_on, how=how, suffixes=suffixes)
+    except KeyError:
+        return left
+
+def to_bool(x) -> bool:
+    if isinstance(x, bool):
+        return x
+    s = str(x).strip().lower()
+    return s in ("1", "true", "yes", "y", "on")
